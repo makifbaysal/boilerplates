@@ -1,0 +1,25 @@
+schema:
+  - internal/adapter/inbound/graphql/schema.graphqls
+
+exec:
+  package: generated
+  layout: single-file
+  filename: internal/adapter/inbound/graphql/generated/generated.go
+
+model:
+  filename: internal/adapter/inbound/graphql/model/models_gen.go
+  package: model
+
+resolver:
+  package: graphql
+  layout: follow-schema
+  dir: internal/adapter/inbound/graphql
+  filename_template: "{name}.resolvers.go"
+
+models:
+  ID:
+    model:
+      - github.com/99designs/gqlgen/graphql.ID
+  Int:
+    model:
+      - github.com/99designs/gqlgen/graphql.Int

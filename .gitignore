@@ -1,0 +1,12 @@
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+# go
+bin/
+*.test
+
+# java / maven
+target/
+*.class

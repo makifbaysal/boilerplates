@@ -1,0 +1,70 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-preprod.yml
+# "preprod" in the name maps this workflow to TaskTrooper's preprod_deploy slot.
+name: deploy-preprod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-preprod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: preprod
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.APP_DIR }}/package.json
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      # NEXT_PUBLIC_/VITE_ vars are baked in HERE, per environment.
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload to GCS
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          gcloud storage rsync -r "${{ vars.BUILD_DIR }}" "gs://${{ vars.GCS_BUCKET }}" \
+            --delete-unmatched-destination-objects --project "${{ vars.GCP_PROJECT_ID }}"
+          # hashed assets cache long; index.html must never be cached
+          gcloud storage objects update "gs://${{ vars.GCS_BUCKET }}/index.html" \
+            --cache-control="no-cache, max-age=0" --project "${{ vars.GCP_PROJECT_ID }}" || true
+
+      - name: Invalidate Cloud CDN
+        if: ${{ vars.GCP_URL_MAP != '' }}
+        run: |
+          gcloud compute url-maps invalidate-cdn-cache "${{ vars.GCP_URL_MAP }}" \
+            --path '/*' --project "${{ vars.GCP_PROJECT_ID }}" --async
+
+      - name: Smoke test
+        run: |
+          url="https://${{ vars.SITE_HOST }}/"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$code" = "200" ]; then echo "up: $url"; exit 0; fi
+            echo "attempt $i -> $code"; sleep 6
+          done
+          echo "::error::site not reachable: $url"; exit 1

@@ -1,0 +1,66 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-preprod.yml
+# "preprod" in the name maps this workflow to TaskTrooper's preprod_deploy slot.
+name: deploy-preprod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-preprod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: preprod
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Migrate (pre-deploy)
+        if: ${{ vars.MIGRATE_COMMAND != '' }}
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ${{ vars.MIGRATE_COMMAND }}
+
+      - name: Render task definition
+        id: taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.APP_DIR }}/task-def.json
+          container-name: ${{ vars.CONTAINER_NAME }}
+          image: ${{ env.IMAGE }}
+
+      # wait-for-service-stability is the smoke test: a task that crash-loops
+      # never stabilizes, so the step fails and the deploy is marked failed.
+      - name: Deploy ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.taskdef.outputs.task-definition }}
+          service: ${{ vars.ECS_SERVICE }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          wait-for-service-stability: true

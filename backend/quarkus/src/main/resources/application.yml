@@ -1,0 +1,47 @@
+# Quarkus Dev Services auto-provisions a Testcontainers instance for
+# every DB/cache extension it detects on the classpath with no
+# connection configured — with postgres+mongo+cassandra+redis+
+# elasticsearch all present (so any one can be chosen via
+# app.datastore), that means every test run pulls and starts five
+# containers, ~100s of pure overhead, for tests that only need the
+# in-memory default. Disabled globally in the test profile; DB-specific
+# ITs re-enable exactly the one they need (see
+# .ai/testing.md#integration-tests).
+"%test":
+  quarkus:
+    devservices:
+      enabled: false
+
+app:
+  datastore: memory
+  # Inbound rate limit (platform/resilience/RateLimitFilter) and the default
+  # circuit breaker settings for outbound dependencies.
+  rate-limit:
+    enabled: true
+    max: 120
+    window-seconds: 60
+  breaker:
+    failure-threshold: 5
+    open-seconds: 30
+    half-open-max-calls: 1
+
+# Hibernate ORM (unlike the Mongo client / our own CqlSession producer)
+# tries to build and validate its persistence unit eagerly at startup
+# purely because a @jakarta.persistence.Entity class is on the
+# classpath — independent of whether app.datastore actually selects
+# postgres. Inactive by default; PostgresTaskRepositoryIT flips this
+# back on for itself alongside a real Testcontainers datasource. See
+# .ai/architecture.md#choosing-a-database.
+quarkus:
+  hibernate-orm:
+    active: false
+
+# SmallRye GraphQL masks any unmapped RuntimeException as a generic
+# "System error" by default (a safe default — don't leak internals) —
+# without this, TaskNotFoundException/InvalidTaskTitleException were
+# indistinguishable from an actual server crash to a GraphQL client.
+# The gRPC/REST siblings map these explicitly (Status/HTTP code); this
+# is GraphQL's equivalent, done via config rather than a mapper class.
+mp:
+  graphql:
+    showErrorMessage: "ai.tasktrooper.boilerplate.quarkus.core.task.TaskNotFoundException,ai.tasktrooper.boilerplate.quarkus.core.task.InvalidTaskTitleException"

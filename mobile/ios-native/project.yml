@@ -1,0 +1,42 @@
+name: TaskTrooperIOS
+options:
+  bundleIdPrefix: ai.tasktrooper
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    GENERATE_INFOPLIST_FILE: YES
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    INFOPLIST_KEY_CFBundleDisplayName: TaskTrooper
+targets:
+  TaskTrooperIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/TaskTrooperIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.tasktrooper.iosnative
+    scheme:
+      testTargets:
+        - TaskTrooperIOSTests
+      commandLineArguments: {}
+
+  TaskTrooperIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/TaskTrooperIOSTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.tasktrooper.iosnative.tests
+    dependencies:
+      - target: TaskTrooperIOS

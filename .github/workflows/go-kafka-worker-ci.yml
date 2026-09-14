@@ -1,0 +1,51 @@
+name: go-kafka-worker-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/go-kafka-worker/**"
+      - ".github/workflows/go-kafka-worker-ci.yml"
+  pull_request:
+    paths:
+      - "worker/go-kafka-worker/**"
+      - ".github/workflows/go-kafka-worker-ci.yml"
+
+defaults:
+  run:
+    working-directory: worker/go-kafka-worker
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: worker/go-kafka-worker/go.mod
+          cache-dependency-path: worker/go-kafka-worker/go.sum
+      - run: go build ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: worker/go-kafka-worker/go.mod
+          cache-dependency-path: worker/go-kafka-worker/go.sum
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: worker/go-kafka-worker
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: worker/go-kafka-worker/go.mod
+          cache-dependency-path: worker/go-kafka-worker/go.sum
+      - run: go test ./... -race -cover

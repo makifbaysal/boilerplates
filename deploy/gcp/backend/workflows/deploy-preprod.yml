@@ -1,0 +1,72 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-preprod.yml
+# "preprod" in the name maps this workflow to TaskTrooper's preprod_deploy slot.
+# Dispatch-only: no push trigger — promotion to preprod is a deliberate action.
+name: deploy-preprod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-preprod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: preprod
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_AR_REPO }}/${{ vars.SERVICE_NAME }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Migrate (pre-deploy)
+        if: ${{ vars.MIGRATE_COMMAND != '' }}
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ${{ vars.MIGRATE_COMMAND }}
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy "${{ vars.SERVICE_NAME }}" \
+            --image "$IMAGE" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --platform managed \
+            --quiet \
+            --format='value(status.url)' > service_url.txt
+          echo "url=$(cat service_url.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test (health check)
+        run: |
+          url="${{ steps.deploy.outputs.url }}${{ vars.HEALTH_PATH || '/health' }}"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$code" = "200" ]; then echo "healthy: $url"; exit 0; fi
+            echo "attempt $i -> $code"; sleep 6
+          done
+          echo "::error::health check failed for $url"; exit 1

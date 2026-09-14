@@ -1,0 +1,275 @@
+# Machine-readable index of every boilerplate in this repo.
+# Consumers (agents, tooling) should read this file before scaffolding new
+# code: if a matching entry exists, copy that folder instead of generating
+# from scratch.
+#
+# Schema per entry:
+#   id:          kebab-case, unique, matches the folder name and the
+#                .github/workflows/<id>-ci.yml file
+#   path:        folder path relative to repo root
+#   type:        backend | frontend | mobile | worker
+#   language:    primary language
+#   framework:   primary framework/runtime
+#   tags:        free-form search tags (include language, framework, type,
+#                and any notable libs so keyword search hits it)
+#   description: one sentence — what's included (health check, CRUD example,
+#                code-gen tooling used)
+#   status:      available | planned
+#
+# Every boilerplate ships the same operational baseline, so a copied project
+# starts production-ready rather than production-eventually:
+#   - .github/workflows/ci.yml  standalone CI (build + lint/analyze + test +
+#                               an optional Sonar job that self-skips without
+#                               SONAR_TOKEN), written for the boilerplate
+#                               folder as the repo root
+#   - sonar-project.properties  quality-gate config with per-stack coverage
+#                               report paths
+#   - rate limit + circuit breaker defaults: inbound limiting on the servers
+#     (per client IP), processing-rate limiting on the worker, and a
+#     throttle + breaker on every mobile/web API client
+version: 1
+boilerplates:
+  - id: go-fiber
+    path: backend/go-fiber
+    type: backend
+    language: go
+    framework: fiber-v3
+    tags:
+      [go, golang, fiber, rest, grpc, graphql, gqlgen, hexagonal,
+       ports-and-adapters, postgres, mongo, mongodb, cassandra, redis,
+       elasticsearch, koanf, slog, backend]
+    description: >-
+      Go backend in hexagonal architecture: one task use case exposed over
+      REST (Fiber v3), gRPC, and GraphQL (gqlgen), with Postgres/MongoDB/
+      Cassandra outbound adapters (+ reusable Redis/Elasticsearch clients),
+      koanf config with live reload, slog logging + interceptors,
+      mockery-generated mocks, testify-suite table-driven tests at every
+      layer, per-transport Dockerfiles.
+    status: available
+
+  - id: go-kafka-worker
+    path: worker/go-kafka-worker
+    type: worker
+    language: go
+    framework: franz-go+amqp091-go
+    tags:
+      [go, golang, kafka, rabbitmq, worker, queue, consumer, hexagonal,
+       ports-and-adapters, postgres, mongo, mongodb, cassandra, redis,
+       elasticsearch, koanf, slog, async, messaging]
+    description: >-
+      Go async worker in hexagonal architecture: one job-processing use
+      case consumed from Kafka (franz-go) and RabbitMQ (amqp091-go), with
+      Postgres/MongoDB/Cassandra outbound adapters (+ reusable Redis/
+      Elasticsearch clients, all shared with backend/go-fiber's pkg/),
+      koanf config with live reload, slog logging via a message-handler
+      middleware, mockery-generated mocks, testify-suite table-driven
+      tests, per-broker Dockerfiles.
+    status: available
+
+  - id: java-spring
+    path: backend/java-spring
+    type: backend
+    language: java
+    framework: spring-boot-3
+    tags:
+      [java, spring, spring-boot, rest, grpc, graphql, hexagonal,
+       ports-and-adapters, postgres, jpa, mongo, mongodb, cassandra, redis,
+       elasticsearch, mockito, junit5, testcontainers, mapstruct, lombok]
+    description: >-
+      Java + Spring Boot backend in hexagonal architecture: one task use
+      case exposed over REST (Spring MVC), gRPC (net.devh), and GraphQL
+      (spring-graphql), with Postgres(JPA)/MongoDB/Cassandra outbound
+      adapters via Spring Data (+ Redis/Elasticsearch starters wired in
+      unused, same as go-fiber's reusable clients), profile-based config
+      with a live log-level file watch, MDC logging via a REST filter +
+      gRPC interceptor, Lombok + MapStruct code generation, Mockito +
+      JUnit5 (@Nested/@ParameterizedTest) tests at every layer plus
+      Testcontainers integration tests, single Dockerfile.
+    status: available
+
+  - id: quarkus
+    path: backend/quarkus
+    type: backend
+    language: java
+    framework: quarkus-3
+    tags:
+      [java, quarkus, rest, grpc, graphql, smallrye, hexagonal,
+       ports-and-adapters, postgres, panache, mongo, mongodb, cassandra,
+       redis, elasticsearch, junit5, testcontainers, mockito]
+    description: >-
+      Java + Quarkus backend in hexagonal architecture: one task use case
+      exposed over REST (Quarkus REST), gRPC (quarkus-grpc), and GraphQL
+      (SmallRye, code-first), with Postgres/MongoDB (Panache) and
+      Cassandra (plain DataStax driver — no maintained Quarkus extension
+      exists) outbound adapters. .ai/architecture.md documents five real
+      Quarkus-specific bugs this structure exists to avoid (CDI
+      ambiguity, eager Hibernate ORM activation, test-resource leaking
+      across classes, a testcontainers version mismatch, GraphQL's
+      set-prefix method-name stripping). MDC logging, JUnit5 +
+      Testcontainers tests, dual JVM/native Dockerfiles.
+    status: available
+
+  - id: ts-react-tailwind-next
+    path: frontend/ts-react-tailwind-next
+    type: frontend
+    language: typescript
+    framework: nextjs
+    tags:
+      [typescript, react, nextjs, tailwind, tailwindcss, tanstack-query,
+       react-query, orval, openapi, atomic-design, vitest,
+       testing-library, frontend]
+    description: >-
+      Next.js (App Router) + TypeScript + Tailwind + TanStack Query
+      frontend, Atomic Design component layering, a typed API client +
+      hooks generated by orval from openapi/task-api.yaml (same Task
+      CRUD shape as the backend/* boilerplates — point
+      NEXT_PUBLIC_API_BASE_URL at any of them). Vitest + Testing Library
+      tests exercise the real generated hooks against a mocked fetch,
+      not a mocked hook layer. Standalone-output Dockerfile.
+    status: available
+
+  - id: flutter
+    path: mobile/flutter
+    type: mobile
+    language: dart
+    framework: flutter
+    tags: [dart, flutter, riverpod, freezed, json_serializable, mobile,
+           atomic-design, http]
+    description: >-
+      Flutter + Riverpod Task CRUD app calling the same REST shape every
+      backend/* boilerplate exposes. Freezed/json_serializable models
+      (code-gen via build_runner), atoms/molecules/organisms widget
+      layering matching frontend/ts-react-tailwind-next. Tests mock only
+      the http.Client I/O boundary and exercise real providers/widgets.
+    status: available
+
+  - id: android-native
+    path: mobile/android-native
+    type: mobile
+    language: kotlin
+    framework: jetpack-compose
+    tags: [kotlin, android, jetpack-compose, hilt, ksp, retrofit, okhttp,
+           kotlinx-serialization, mobile]
+    description: >-
+      Kotlin + Jetpack Compose + Hilt (KSP) + Retrofit Task CRUD app
+      calling the same REST shape every backend/* boilerplate exposes.
+      AGP 9's built-in Kotlin support (no separate kotlin-android
+      plugin). .ai/architecture.md documents three real bugs hit
+      building this (a retrofit-kotlinx-serialization package-name
+      gotcha, a Kotlin nested-comment trap, compileSdk 36 requirement).
+      Unit tests mock only the MockWebServer I/O boundary.
+    status: available
+
+  - id: ios-native
+    path: mobile/ios-native
+    type: mobile
+    language: swift
+    framework: swiftui
+    tags: [swift, swiftui, ios, xcodegen, observation, urlsession,
+           swift-testing, mobile]
+    description: >-
+      SwiftUI + Swift 6 (strict concurrency) Task CRUD app calling the
+      same REST shape every backend/* boilerplate exposes. Xcode
+      project generated via XcodeGen from project.yml (not committed —
+      see CLAUDE.md). .ai/architecture.md documents three real bugs hit
+      building this, most notably that the domain model is named
+      TaskItem (not Task) because Task collides with Swift's own
+      concurrency primitive. Swift Testing tests mock only the
+      URLProtocol I/O boundary.
+    status: available
+
+  # ---- Deploy boilerplates (type: deploy) ----
+  # CD templates organized by cloud + app-type (see deploy/README.md). Not a
+  # standalone project: copy the matching folder's workflows into your project's
+  # .github/workflows/ as <id>-deploy-<env>.yml. For these entries `language` is
+  # the target cloud and `framework` is the compute target.
+  - id: deploy-gcp-backend
+    path: deploy/gcp/backend
+    type: deploy
+    language: gcp
+    framework: cloud-run
+    tags: [deploy, cd, gcp, google-cloud, cloud-run, backend, container,
+           docker, wif, oidc, github-actions, stage, preprod, prod]
+    description: >-
+      Cloud Run container deploy for any backend boilerplate: stage/preprod/prod
+      GitHub Actions workflows, Workload Identity Federation auth (no keys),
+      migrate-before-deploy step, health-check smoke gate, SHA-tagged images.
+    status: available
+
+  - id: deploy-gcp-worker
+    path: deploy/gcp/worker
+    type: deploy
+    language: gcp
+    framework: cloud-run
+    tags: [deploy, cd, gcp, google-cloud, cloud-run, worker, consumer, kafka,
+           rabbitmq, no-ingress, wif, oidc, github-actions]
+    description: >-
+      Always-on Cloud Run (worker mode, min-instances=1, no ingress) deploy for
+      long-running consumers: stage/preprod/prod workflows, WIF auth, and a
+      revision-ready smoke check.
+    status: available
+
+  - id: deploy-gcp-web
+    path: deploy/gcp/web
+    type: deploy
+    language: gcp
+    framework: gcs-cdn
+    tags: [deploy, cd, gcp, google-cloud, gcs, cloud-cdn, firebase-hosting, web,
+           frontend, static, wif, oidc, github-actions]
+    description: >-
+      Static web deploy to a GCS bucket behind Cloud CDN (Firebase Hosting
+      alternative noted): per-env public build vars, cache-control on index.html,
+      CDN invalidation, URL smoke check. SSR? use deploy-gcp-backend.
+    status: available
+
+  - id: deploy-aws-backend
+    path: deploy/aws/backend
+    type: deploy
+    language: aws
+    framework: app-runner
+    tags: [deploy, cd, aws, app-runner, ecs, fargate, ecr, backend, container,
+           docker, oidc, github-actions, stage, preprod, prod]
+    description: >-
+      App Runner container deploy for any backend boilerplate (ECS Fargate
+      alternative documented): stage/preprod/prod workflows, OIDC role auth (no
+      keys), ECR push, migrate-before-deploy, health-check smoke gate.
+    status: available
+
+  - id: deploy-aws-worker
+    path: deploy/aws/worker
+    type: deploy
+    language: aws
+    framework: ecs-fargate
+    tags: [deploy, cd, aws, ecs, fargate, ecr, worker, consumer, kafka,
+           rabbitmq, no-alb, oidc, github-actions]
+    description: >-
+      ECS Fargate service deploy (no load balancer) for long-running consumers:
+      stage/preprod/prod workflows, OIDC auth, task-def render, and wait-for-
+      service-stability as the smoke test. Includes a task-def.json template.
+    status: available
+
+  - id: deploy-aws-web
+    path: deploy/aws/web
+    type: deploy
+    language: aws
+    framework: s3-cloudfront
+    tags: [deploy, cd, aws, s3, cloudfront, web, frontend, static, oidc,
+           github-actions]
+    description: >-
+      Static web deploy to S3 + CloudFront: per-env public build vars, s3 sync,
+      no-cache index.html, CloudFront invalidation, URL smoke check. SSR? use
+      deploy-aws-backend.
+    status: available
+
+  - id: deploy-mobile
+    path: deploy/mobile
+    type: deploy
+    language: multi
+    framework: fastlane
+    tags: [deploy, cd, mobile, ios, android, fastlane, testflight, play-store,
+           app-store, match, github-actions, cloud-independent]
+    description: >-
+      Cloud-independent mobile CD with fastlane: stage/preprod/prod workflows
+      mapping to TestFlight + Play internal/beta/production, match signing (iOS)
+      and keystore signing (Android). Real store secrets (no OIDC path).
+    status: available

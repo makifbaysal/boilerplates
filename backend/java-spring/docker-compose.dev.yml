@@ -1,0 +1,30 @@
+# Local backing services for the outbound DB adapters' Testcontainers
+# ITs (those actually manage their own containers automatically — see
+# .ai/testing.md) and for manual `mvn spring-boot:run` testing against a
+# real DB. `docker compose -f docker-compose.dev.yml up -d`, then e.g.:
+#   SPRING_PROFILES_ACTIVE=dev,postgres mvn spring-boot:run
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+
+  mongo:
+    image: mongo:8
+    ports: ["27017:27017"]
+
+  cassandra:
+    image: cassandra:5
+    ports: ["9042:9042"]
+
+  redis:
+    image: redis:8-alpine
+    ports: ["6379:6379"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    ports: ["9200:9200"]

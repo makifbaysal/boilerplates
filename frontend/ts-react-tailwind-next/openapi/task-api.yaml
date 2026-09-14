@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: Task API
+  version: "1.0"
+  description: >-
+    Matches the REST shape of backend/go-fiber, backend/java-spring, and
+    backend/quarkus — this frontend's generated client can point at any
+    of them. orval reads this file to generate lib/api/generated/.
+paths:
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: List tasks
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "400":
+          description: Invalid title
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      summary: Get a task
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Not found
+    patch:
+      operationId: setTaskDone
+      summary: Mark a task done/not done
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDoneRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    delete:
+      operationId: deleteTask
+      summary: Delete a task
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "204":
+          description: No Content
+components:
+  parameters:
+    TaskId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Task:
+      type: object
+      required: [id, title, done, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        done:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+    SetDoneRequest:
+      type: object
+      required: [done]
+      properties:
+        done:
+          type: boolean

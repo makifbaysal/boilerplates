@@ -1,0 +1,55 @@
+# Standalone CI: assumes this folder is the repository root.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - run: |
+          xcodebuild build \
+            -project TaskTrooperIOS.xcodeproj -scheme TaskTrooperIOS \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipMacroValidation
+
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Pick an available iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available iPhone -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(v["udid"] for k in d for v in d[k] if v["isAvailable"]))')
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+      - run: |
+          xcodebuild test \
+            -project TaskTrooperIOS.xcodeproj -scheme TaskTrooperIOS \
+            -destination "id=$SIMULATOR_UDID" \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
+            -skipMacroValidation
+
+  sonar:
+    runs-on: macos-15
+    needs: test
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: SonarQube scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

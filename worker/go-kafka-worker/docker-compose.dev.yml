@@ -1,0 +1,52 @@
+# Local backing services for the inbound consumers and outbound DB
+# adapters, and their integration tests (*_integration_test.go — each
+# skips unless its env var below is set). Not used by CI; CI runs unit
+# tests only. `docker compose -f docker-compose.dev.yml up -d`, then:
+#   KAFKA_TEST_BROKERS=localhost:9092 \
+#   RABBITMQ_TEST_URL="amqp://guest:guest@localhost:5672/" \
+#   POSTGRES_TEST_DSN="postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable" \
+#   MONGO_TEST_URI="mongodb://localhost:27017" \
+#   CASSANDRA_TEST_HOSTS="localhost" \
+#   go test ./... -tags=integration -v
+services:
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports: ["9092:9092"]
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports: ["5672:5672", "15672:15672"]
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+
+  mongo:
+    image: mongo:8
+    ports: ["27017:27017"]
+
+  cassandra:
+    image: cassandra:5
+    ports: ["9042:9042"]
+
+  redis:
+    image: redis:8-alpine
+    ports: ["6379:6379"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    ports: ["9200:9200"]

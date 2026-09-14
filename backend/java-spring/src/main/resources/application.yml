@@ -1,0 +1,55 @@
+# Base config, always loaded. Postgres/JPA, MongoDB, and Cassandra
+# autoconfiguration are ALL excluded here by default — with three DB
+# starters on one classpath (so `postgres`/`mongo`/`cassandra` profiles
+# can each activate one), Spring Boot would otherwise try to
+# autoconfigure all three at once and fail to start (see
+# .ai/architecture.md#config for the incident this fixes). Each
+# application-{postgres,mongo,cassandra}.yml re-excludes only the OTHER
+# two, which is what actually turns its own DB on.
+spring:
+  application:
+    name: java-spring
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.cassandra.CassandraAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.cassandra.CassandraDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.cassandra.CassandraRepositoriesAutoConfiguration
+
+server:
+  port: 8080
+
+grpc:
+  server:
+    port: 9090
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,loggers
+  endpoint:
+    loggers:
+      access: unrestricted
+
+logging:
+  level:
+    root: info
+
+# Inbound rate limit (platform/resilience/RateLimitFilter) and the default
+# circuit breaker settings for outbound dependencies.
+app:
+  rate-limit:
+    enabled: true
+    max: 120
+    window-seconds: 60
+  breaker:
+    failure-threshold: 5
+    open-seconds: 30
+    half-open-max-calls: 1

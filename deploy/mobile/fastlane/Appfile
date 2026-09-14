@@ -1,0 +1,6 @@
+app_identifier(ENV["IOS_BUNDLE_ID"])
+apple_id(ENV["APPLE_ID"]) # optional when using an App Store Connect API key
+
+for_platform :android do
+  package_name(ENV["ANDROID_PACKAGE_NAME"])
+end

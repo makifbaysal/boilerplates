@@ -1,0 +1,51 @@
+name: go-fiber-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/go-fiber/**"
+      - ".github/workflows/go-fiber-ci.yml"
+  pull_request:
+    paths:
+      - "backend/go-fiber/**"
+      - ".github/workflows/go-fiber-ci.yml"
+
+defaults:
+  run:
+    working-directory: backend/go-fiber
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go-fiber/go.mod
+          cache-dependency-path: backend/go-fiber/go.sum
+      - run: go build ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go-fiber/go.mod
+          cache-dependency-path: backend/go-fiber/go.sum
+      - run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: backend/go-fiber
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go-fiber/go.mod
+          cache-dependency-path: backend/go-fiber/go.sum
+      - run: go test ./... -race -cover

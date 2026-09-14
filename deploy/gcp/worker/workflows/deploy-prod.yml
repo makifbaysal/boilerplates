@@ -1,0 +1,76 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-prod.yml
+# "prod" in the name maps this workflow to TaskTrooper's prod_deploy slot.
+name: deploy-prod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push image
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_AR_REPO }}/${{ vars.SERVICE_NAME }}:${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Migrate (pre-deploy)
+        if: ${{ vars.MIGRATE_COMMAND != '' }}
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ${{ vars.MIGRATE_COMMAND }}
+
+      # A consumer has no inbound HTTP, so run it as an always-on Cloud Run
+      # service (min-instances=1, CPU always allocated), not a request-scaled
+      # one. The container must still bind $PORT with a tiny health endpoint.
+      - name: Deploy worker to Cloud Run
+        run: |
+          gcloud run deploy "${{ vars.SERVICE_NAME }}" \
+            --image "$IMAGE" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --platform managed \
+            --no-allow-unauthenticated \
+            --no-cpu-throttling \
+            --min-instances=1 \
+            --quiet
+
+      - name: Verify revision is Ready
+        run: |
+          for i in $(seq 1 20); do
+            ready=$(gcloud run services describe "${{ vars.SERVICE_NAME }}" \
+              --region "${{ vars.GCP_REGION }}" --project "${{ vars.GCP_PROJECT_ID }}" \
+              --format='value(status.conditions[0].status)' 2>/dev/null || true)
+            echo "Ready=$ready"; [ "$ready" = "True" ] && exit 0; sleep 6
+          done
+          echo "::error::worker revision did not become Ready"; exit 1

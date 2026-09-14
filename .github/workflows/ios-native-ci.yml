@@ -1,0 +1,46 @@
+name: ios-native-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/ios-native/**"
+      - ".github/workflows/ios-native-ci.yml"
+  pull_request:
+    paths:
+      - "mobile/ios-native/**"
+      - ".github/workflows/ios-native-ci.yml"
+
+defaults:
+  run:
+    working-directory: mobile/ios-native
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - run: |
+          xcodebuild build \
+            -project TaskTrooperIOS.xcodeproj -scheme TaskTrooperIOS \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipMacroValidation
+
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - name: Pick an available iPhone simulator
+        run: |
+          UDID=$(xcrun simctl list devices available iPhone -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(v["udid"] for k in d for v in d[k] if v["isAvailable"]))')
+          echo "SIMULATOR_UDID=$UDID" >> "$GITHUB_ENV"
+      - run: |
+          xcodebuild test \
+            -project TaskTrooperIOS.xcodeproj -scheme TaskTrooperIOS \
+            -destination "id=$SIMULATOR_UDID" \
+            -skipMacroValidation

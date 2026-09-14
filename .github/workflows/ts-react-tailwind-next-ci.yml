@@ -1,0 +1,53 @@
+name: ts-react-tailwind-next-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/ts-react-tailwind-next/**"
+      - ".github/workflows/ts-react-tailwind-next-ci.yml"
+  pull_request:
+    paths:
+      - "frontend/ts-react-tailwind-next/**"
+      - ".github/workflows/ts-react-tailwind-next-ci.yml"
+
+defaults:
+  run:
+    working-directory: frontend/ts-react-tailwind-next
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/ts-react-tailwind-next/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/ts-react-tailwind-next/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/ts-react-tailwind-next/package-lock.json
+      - run: npm ci
+      - run: npm test

@@ -1,0 +1,78 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-prod.yml
+# "prod" in the name maps this workflow to TaskTrooper's prod_deploy slot —
+# this is the workflow trigger_release dispatches. Dispatch-only.
+name: deploy-prod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Migrate (pre-deploy)
+        if: ${{ vars.MIGRATE_COMMAND != '' }}
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ${{ vars.MIGRATE_COMMAND }}
+
+      - name: Deploy to App Runner
+        run: |
+          aws apprunner update-service \
+            --service-arn "${{ vars.APP_RUNNER_SERVICE_ARN }}" \
+            --source-configuration "ImageRepository={ImageIdentifier=$IMAGE,ImageRepositoryType=ECR,ImageConfiguration={Port=${{ vars.APP_PORT || '8080' }}}}"
+          for i in $(seq 1 30); do
+            status=$(aws apprunner describe-service --service-arn "${{ vars.APP_RUNNER_SERVICE_ARN }}" --query 'Service.Status' --output text)
+            echo "app runner status: $status"
+            case "$status" in
+              RUNNING) break ;;
+              *FAILED*|DELETE_FAILED) echo "::error::deploy failed ($status)"; exit 1 ;;
+            esac
+            sleep 10
+          done
+
+      - name: Smoke test (health check)
+        run: |
+          url="https://${{ vars.SERVICE_URL }}${{ vars.HEALTH_PATH || '/health' }}"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$code" = "200" ]; then echo "healthy: $url"; exit 0; fi
+            echo "attempt $i -> $code"; sleep 6
+          done
+          echo "::error::health check failed for $url"; exit 1
+
+      # Rollback: point the service back at the previous image tag.
+      #   aws apprunner update-service --service-arn <arn> \
+      #     --source-configuration "ImageRepository={ImageIdentifier=<prev-sha>,ImageRepositoryType=ECR}"

@@ -1,0 +1,30 @@
+# Local backing services for manual `mvn quarkus:dev` testing against a
+# real DB. The Testcontainers ITs (PostgresTaskRepositoryIT etc, see
+# .ai/testing.md) manage their own containers automatically and don't
+# need this — it's for `app.datastore=postgres mvn quarkus:dev` style
+# manual runs. `docker compose -f docker-compose.dev.yml up -d`.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+
+  mongo:
+    image: mongo:8
+    ports: ["27017:27017"]
+
+  cassandra:
+    image: cassandra:5
+    ports: ["9042:9042"]
+
+  redis:
+    image: redis:8-alpine
+    ports: ["6379:6379"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    ports: ["9200:9200"]

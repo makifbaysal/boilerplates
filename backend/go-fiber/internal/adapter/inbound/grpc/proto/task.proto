@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package task.v1;
+
+option go_package = "github.com/makifbaysal/boilerplates/backend/go-fiber/internal/adapter/inbound/grpc/taskpb";
+
+import "google/protobuf/timestamp.proto";
+
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (Task);
+  rpc GetTask(GetTaskRequest) returns (Task);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc SetTaskDone(SetTaskDoneRequest) returns (Task);
+  rpc DeleteTask(DeleteTaskRequest) returns (DeleteTaskResponse);
+}
+
+message Task {
+  string id = 1;
+  string title = 2;
+  bool done = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message CreateTaskRequest {
+  string title = 1;
+}
+
+message GetTaskRequest {
+  string id = 1;
+}
+
+message ListTasksRequest {}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+}
+
+message SetTaskDoneRequest {
+  string id = 1;
+  bool done = 2;
+}
+
+message DeleteTaskRequest {
+  string id = 1;
+}
+
+message DeleteTaskResponse {}

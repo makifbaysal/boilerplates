@@ -1,0 +1,26 @@
+env: prod
+
+kafka:
+  brokers: ["kafka:9092"]
+  topic: task-events
+  group_id: go-kafka-worker
+
+rabbitmq:
+  url: "amqp://guest:guest@rabbitmq:5672/"
+  queue: task-events
+
+log:
+  level: warn
+  format: json
+
+# Processing rate ceiling. The queue absorbs the burst; the database does not.
+rate_limit:
+  per_second: 200
+  burst: 200
+  wait_seconds: 5
+
+# Default circuit breaker for outbound dependencies (pkg/resilience).
+breaker:
+  failure_threshold: 5
+  open_seconds: 30
+  half_open_max_calls: 1

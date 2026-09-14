@@ -1,0 +1,43 @@
+name: java-spring-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/java-spring/**"
+      - ".github/workflows/java-spring-ci.yml"
+  pull_request:
+    paths:
+      - "backend/java-spring/**"
+      - ".github/workflows/java-spring-ci.yml"
+
+defaults:
+  run:
+    working-directory: backend/java-spring
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B compile
+
+  # No static analyzer wired in yet (unlike go-fiber's golangci-lint) —
+  # `mvn -B compile` surfaces javac warnings but nothing fails the build
+  # on them. Add checkstyle/spotbugs here if this boilerplate grows a
+  # real style guide to enforce.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B test

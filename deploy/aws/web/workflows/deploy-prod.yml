@@ -1,0 +1,63 @@
+# Copy to <your-repo>/.github/workflows/<id>-deploy-prod.yml
+# "prod" in the name maps this workflow to TaskTrooper's prod_deploy slot.
+name: deploy-prod
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      APP_DIR: ${{ vars.APP_DIR || '.' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.APP_DIR }}/package.json
+          cache: npm
+          cache-dependency-path: ${{ env.APP_DIR }}/package-lock.json
+
+      - name: Build
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Sync to S3
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          aws s3 sync "${{ vars.BUILD_DIR }}" "s3://${{ vars.S3_BUCKET }}" --delete
+          aws s3 cp "${{ vars.BUILD_DIR }}/index.html" "s3://${{ vars.S3_BUCKET }}/index.html" \
+            --cache-control "no-cache, max-age=0" --content-type text/html
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths '/*'
+
+      - name: Smoke test
+        run: |
+          url="https://${{ vars.SITE_HOST }}/"
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+            if [ "$code" = "200" ]; then echo "up: $url"; exit 0; fi
+            echo "attempt $i -> $code"; sleep 6
+          done
+          echo "::error::site not reachable: $url"; exit 1

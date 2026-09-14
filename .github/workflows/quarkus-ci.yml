@@ -1,0 +1,40 @@
+name: quarkus-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/quarkus/**"
+      - ".github/workflows/quarkus-ci.yml"
+  pull_request:
+    paths:
+      - "backend/quarkus/**"
+      - ".github/workflows/quarkus-ci.yml"
+
+defaults:
+  run:
+    working-directory: backend/quarkus
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B -DskipITs=true compile
+
+  # No static analyzer wired in yet — same note as java-spring-ci.yml.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B -DskipITs=true test
